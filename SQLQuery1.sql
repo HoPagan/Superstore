@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 -- =============================================
--- Author:		Milton Cruz	
+-- Author:		Harold Pagan
 -- Create date: 4/16/2024
 -- Update date: 
 -- Description:	Update a Customer
