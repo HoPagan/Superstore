@@ -6,11 +6,11 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 -- =============================================
--- Author:		Milton Cruz	
+-- Author:		Harold Pagan
 -- Create date: 4/16/2024
 -- Update date: 
 -- Description:	Update a Customer
--- EXEC UpdateCustomer @FirstName = 'Milton', @LastName = 'Cruz', @SegmentID = 1, @CustomerID = 1
+-- EXEC UpdateCustomer @FirstName = 'Harold', @LastName = 'Pagan', @SegmentID = 1, @CustomerID = 1
 -- =============================================
 CREATE PROCEDURE [dbo].[UpdateCustomer]
 	@FirstName NVARCHAR(50),
