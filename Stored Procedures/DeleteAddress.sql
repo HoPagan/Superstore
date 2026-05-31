@@ -1,6 +1,5 @@
 USE [Superstore]
 GO
-/****** Object:  StoredProcedure [dbo].[DeleteAddress]    Script Date: 4/23/2026 1:57:11 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -8,34 +7,33 @@ GO
 -- =============================================
 -- Author:		Harold Pagan	
 -- Create date: 4/23/2026
--- Update date: 
--- Description:	Either going to Delete or Deactivate an address
--- EXEC DeleteAddress @CustomerID = 1
--- EXEC DeleteAddress @CustomerID = 1, @Delete = 1
+-- Update date: 5/31/2026
+-- Description:	Safely delete or deactivate a single specific address
+-- EXEC DeleteAddress @AddressID = 1
+-- EXEC DeleteAddress @AddressID = 1, @Delete = 1
 -- =============================================
-CREATE PROCEDURE [dbo].[DeleteAddress]
-	@CustomerID INT,
+CREATE OR ALTER PROCEDURE [dbo].[DeleteAddress]
+	@AddressID INT,
 	@Delete BIT = 0
 AS
 BEGIN
-	-- SET NOCOUNT ON added to prevent extra result sets from
-	-- interfering with SELECT statements.
 	SET NOCOUNT ON;
 
     BEGIN TRY
 		IF @Delete = 1
 			BEGIN
 				DELETE FROM dbo.Address
-				WHERE CustomerID = @CustomerID;
+				WHERE AddressID = @AddressID;
 			END
 		ELSE 
 			BEGIN
             	UPDATE dbo.Address
-				SET IsActive = 0, DateUpdated = GETDATE()
-				WHERE CustomerID = @CustomerID;
+				SET IsActive = 0
+				WHERE AddressID = @AddressID;
 			END
 	END TRY
 	BEGIN CATCH
-        SELECT ERROR_MESSAGE() AS ErrorMessage;
+        THROW;
 	END CATCH;
-END
+END;
+GO

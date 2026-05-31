@@ -1,3 +1,17 @@
+USE [Superstore]
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:		Harold Pagan	
+-- Create date: 5/20/2026
+-- Update date: 5/31/2026
+-- Description:	Verification script to test single-batch transaction insertions
+-- EXEC Test_InsertOrderWithDetails
+-- =============================================
+
 -- 1. Declare the table variable using your custom type
 DECLARE @SampleItems dbo.OrderDetailType;
 

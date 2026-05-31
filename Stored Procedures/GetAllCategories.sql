@@ -1,6 +1,5 @@
 USE [Superstore]
 GO
-/****** Object:  StoredProcedure [dbo].[GetAllCategories]    Script Date: 5/14/2026 2:27:14 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -8,22 +7,22 @@ GO
 -- =============================================
 -- Author:		Harold Pagan	
 -- Create date: 5/8/2026
--- Update date: 
--- Description:	Get all Categories
+-- Update date: 5/31/2026
+-- Description:	Get all Category tiers sorted alphabetically
 -- EXEC GetAllCategories
 -- =============================================
-CREATE PROCEDURE [dbo].[GetAllCategories]
+CREATE OR ALTER PROCEDURE [dbo].[GetAllCategories]
 AS
 BEGIN
-	-- SET NOCOUNT ON added to prevent extra result sets from
-	-- interfering with SELECT statements.
 	SET NOCOUNT ON;
 
     BEGIN TRY
 		SELECT CategoryID, Category
-		FROM dbo.Category;
+		FROM dbo.Category
+		ORDER BY Category ASC;
 	END TRY
 	BEGIN CATCH
-   		SELECT ERROR_MESSAGE() AS ErrorMessage;
+		THROW;
 	END CATCH;
-END
+END;
+GO
