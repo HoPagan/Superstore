@@ -30,8 +30,8 @@ BEGIN
         -- Capture the generated ID to link child rows
         SET @NewOrderID = SCOPE_IDENTITY();
 
-        -- 2. Batch Operation: Insert all rows from the TVP into OrderDetails
-        INSERT INTO dbo.OrderDetails (OrderID, ProductID, Quantity, Discount, Profit)
+        -- 2. Batch Operation: Insert all rows from the TVP into OrderDetail (Singular)
+        INSERT INTO dbo.OrderDetail (OrderID, ProductID, Quantity, Discount, Profit)
         SELECT @NewOrderID, ProductID, Quantity, Discount, Profit
         FROM @OrderItems;
 

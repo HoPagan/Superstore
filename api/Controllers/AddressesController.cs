@@ -1,7 +1,11 @@
+using System;
+using System.Collections.Generic;
 using System.Data;
+using System.Linq;
+using System.Threading.Tasks;
+using api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
 
 namespace api.Controllers;
 
@@ -9,38 +13,23 @@ namespace api.Controllers;
 [Route("api/[controller]")]
 public class AddressesController : ControllerBase
 {
-    private readonly IConfiguration _configuration;
-    private readonly string? _connectionString;
+    private readonly IDatabaseService _db;
 
-    public AddressesController(IConfiguration configuration)
+    public AddressesController(IDatabaseService db)
     {
-        _configuration = configuration;
-        _connectionString = _configuration.GetConnectionString("Superstore");
+        _db = db;
     }
 
     // 1. READ ALL BY CUSTOMER: GET /api/addresses?customerId=1
     [HttpGet(Name = "GetAddresses")]
-    public IActionResult Get([FromQuery] int customerId)
+    public async Task<IActionResult> Get([FromQuery] int customerId)
     {
         try
         {
-            List<Address> addresses = new List<Address>();
-
-            using (SqlConnection connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-                SqlCommand command = new SqlCommand("GetAllAddresses", connection);
-                command.CommandType = CommandType.StoredProcedure;
-                command.Parameters.AddWithValue("@CustomerID", customerId);
-
-                using (SqlDataReader reader = command.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        addresses.Add(MapFromReader(reader));
-                    }
-                }
-            }
+            var parameters = new[] { new SqlParameter("@CustomerID", customerId) };
+            List<Dictionary<string, object?>> rows = await _db.QueryAsync("GetAllAddresses", parameters);
+            List<Address> addresses = rows.Select(MapFromDictionary).ToList();
+            
             return Ok(addresses);
         }
         catch (Exception ex)
@@ -51,29 +40,17 @@ public class AddressesController : ControllerBase
 
     // 2. READ SINGLE: GET /api/addresses/{id}
     [HttpGet("{id}", Name = "GetAddressById")]
-    public IActionResult GetById(int id)
+    public async Task<IActionResult> GetById(int id)
     {
         try
         {
-            Address? address = null;
+            var parameters = new[] { new SqlParameter("@AddressID", id) };
+            var row = await _db.QuerySingleAsync("GetAddress", parameters);
+            
+            if (row == null) 
+                return NotFound($"Address with ID {id} not found.");
 
-            using (SqlConnection connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-                SqlCommand command = new SqlCommand("GetAddress", connection);
-                command.CommandType = CommandType.StoredProcedure;
-                command.Parameters.AddWithValue("@AddressID", id);
-
-                using (SqlDataReader reader = command.ExecuteReader())
-                {
-                    if (reader.Read())
-                    {
-                        address = MapFromReader(reader);
-                    }
-                }
-            }
-
-            if (address == null) return NotFound($"Address with ID {id} not found.");
+            Address address = MapFromDictionary(row);
             return Ok(address);      
         }
         catch (Exception ex)
@@ -84,30 +61,26 @@ public class AddressesController : ControllerBase
 
     // 3. CREATE: POST /api/addresses
     [HttpPost]
-    public IActionResult Post([FromBody] AddressInput model)
+    public async Task<IActionResult> Post([FromBody] AddressInput model)
     {
         try
         {
-            int newAddressId = 0;
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            var parameters = new[]
             {
-                connection.Open();
-                SqlCommand command = new SqlCommand("CreateAddress", connection);
-                command.CommandType = CommandType.StoredProcedure;
+                new SqlParameter("@AddressLine1", model.AddressLine1),
+                new SqlParameter("@AddressLine2", model.AddressLine2 ?? (object)DBNull.Value),
+                new SqlParameter("@City", model.City),
+                new SqlParameter("@StateID", model.StateID),
+                new SqlParameter("@CountryID", model.CountryID),
+                new SqlParameter("@PostalCode", model.PostalCode),
+                new SqlParameter("@RegionID", model.RegionID),
+                new SqlParameter("@AddressTypeID", model.AddressTypeID),
+                new SqlParameter("@CustomerID", model.CustomerID)
+            };
 
-                command.Parameters.AddWithValue("@AddressLine1", model.AddressLine1);
-                command.Parameters.AddWithValue("@AddressLine2", model.AddressLine2 ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@City", model.City);
-                command.Parameters.AddWithValue("@StateID", model.StateID);
-                command.Parameters.AddWithValue("@CountryID", model.CountryID);
-                command.Parameters.AddWithValue("@PostalCode", model.PostalCode);
-                command.Parameters.AddWithValue("@RegionID", model.RegionID);
-                command.Parameters.AddWithValue("@AddressTypeID", model.AddressTypeID);
-                command.Parameters.AddWithValue("@CustomerID", model.CustomerID);
-
-                newAddressId = Convert.ToInt32(command.ExecuteScalar());
-            }
-            return Ok(new { message = "Address created successfully", addressId = newAddressId });
+            // Using QuerySingleAsync because 'CreateAddress' uses ExecuteScalar to return the new numeric primary key ID
+            var row = await _db.QuerySingleAsync("CreateAddress", parameters);
+            return Ok(new { message = "Address created successfully", data = row });
         }
         catch (Exception ex)
         {
@@ -117,29 +90,25 @@ public class AddressesController : ControllerBase
 
     // 4. UPDATE: PUT /api/addresses/{id}
     [HttpPut("{id}")]
-    public IActionResult Put(int id, [FromBody] AddressInput model)
+    public async Task<IActionResult> Put(int id, [FromBody] AddressInput model)
     {
         try
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            var parameters = new[]
             {
-                connection.Open();
-                SqlCommand command = new SqlCommand("UpdateAddress", connection);
-                command.CommandType = CommandType.StoredProcedure;
+                new SqlParameter("@AddressID", id),
+                new SqlParameter("@AddressLine1", model.AddressLine1 ?? (object)DBNull.Value),
+                new SqlParameter("@AddressLine2", model.AddressLine2 ?? (object)DBNull.Value),
+                new SqlParameter("@City", model.City ?? (object)DBNull.Value),
+                new SqlParameter("@StateID", model.StateID == 0 ? (object)DBNull.Value : model.StateID),
+                new SqlParameter("@CountryID", model.CountryID == 0 ? (object)DBNull.Value : model.CountryID),
+                new SqlParameter("@PostalCode", model.PostalCode == 0 ? (object)DBNull.Value : model.PostalCode),
+                new SqlParameter("@RegionID", model.RegionID == 0 ? (object)DBNull.Value : model.RegionID),
+                new SqlParameter("@AddressTypeID", model.AddressTypeID == 0 ? (object)DBNull.Value : model.AddressTypeID),
+                new SqlParameter("@CustomerID", model.CustomerID == 0 ? (object)DBNull.Value : model.CustomerID)
+            };
 
-                command.Parameters.AddWithValue("@AddressID", id);
-                command.Parameters.AddWithValue("@AddressLine1", model.AddressLine1 ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@AddressLine2", model.AddressLine2 ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@City", model.City ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@StateID", model.StateID == 0 ? (object)DBNull.Value : model.StateID);
-                command.Parameters.AddWithValue("@CountryID", model.CountryID == 0 ? (object)DBNull.Value : model.CountryID);
-                command.Parameters.AddWithValue("@PostalCode", model.PostalCode == 0 ? (object)DBNull.Value : model.PostalCode);
-                command.Parameters.AddWithValue("@RegionID", model.RegionID == 0 ? (object)DBNull.Value : model.RegionID);
-                command.Parameters.AddWithValue("@AddressTypeID", model.AddressTypeID == 0 ? (object)DBNull.Value : model.AddressTypeID);
-                command.Parameters.AddWithValue("@CustomerID", model.CustomerID == 0 ? (object)DBNull.Value : model.CustomerID);
-
-                command.ExecuteNonQuery();
-            }
+            await _db.ExecuteAsync("UpdateAddress", parameters);
             return Ok(new { message = "Address updated successfully" });
         }
         catch (Exception ex)
@@ -150,21 +119,17 @@ public class AddressesController : ControllerBase
 
     // 5. DELETE: DELETE /api/addresses/{id}
     [HttpDelete("{id}")]
-    public IActionResult Delete(int id)
+    public async Task<IActionResult> Delete(int id)
     {
         try
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            var parameters = new[]
             {
-                connection.Open();
-                SqlCommand command = new SqlCommand("DeleteAddress", connection);
-                command.CommandType = CommandType.StoredProcedure;
+                new SqlParameter("@AddressID", id),
+                new SqlParameter("@Delete", 1)
+            };
 
-                command.Parameters.AddWithValue("@AddressID", id);
-                command.Parameters.AddWithValue("@Delete", 1); // Triggers permanent/cascade check inside procedure
-
-                command.ExecuteNonQuery();
-            }
+            await _db.ExecuteAsync("DeleteAddress", parameters);
             return Ok(new { message = "Address removed successfully" });
         }
         catch (Exception ex)
@@ -173,26 +138,26 @@ public class AddressesController : ControllerBase
         }
     }
 
-    // Reusable data reader mapping utility to keep endpoints clean
-    private static Address MapFromReader(SqlDataReader reader)
+    // Modern mapping framework connecting decoupled result payloads into objects securely
+    private static Address MapFromDictionary(Dictionary<string, object?> row)
     {
         return new Address
         {
-            AddressID = Convert.ToInt32(reader["AddressID"]),
-            AddressLine1 = reader["AddressLine1"].ToString() ?? string.Empty,
-            AddressLine2 = reader["AddressLine2"] != DBNull.Value ? reader["AddressLine2"].ToString() ?? string.Empty : string.Empty,
-            City = reader["City"].ToString() ?? string.Empty,
-            State = reader["State"].ToString() ?? string.Empty,
-            PostalCode = Convert.ToInt32(reader["PostalCode"]),
-            Country = reader["Country"].ToString() ?? string.Empty,
-            Region = reader["Region"].ToString() ?? string.Empty,
-            AddressType = reader["AddressType"].ToString() ?? string.Empty,
-            CustomerID = Convert.ToInt32(reader["CustomerID"])
+            AddressID = Convert.ToInt32(row["AddressID"]),
+            AddressLine1 = Convert.ToString(row["AddressLine1"]) ?? string.Empty,
+            AddressLine2 = row.ContainsKey("AddressLine2") && row["AddressLine2"] != null ? Convert.ToString(row["AddressLine2"]) ?? string.Empty : string.Empty,
+            City = Convert.ToString(row["City"]) ?? string.Empty,
+            State = row.ContainsKey("State") ? Convert.ToString(row["State"]) ?? string.Empty : string.Empty,
+            PostalCode = Convert.ToInt32(row["PostalCode"]),
+            Country = row.ContainsKey("Country") ? Convert.ToString(row["Country"]) ?? string.Empty : string.Empty,
+            Region = row.ContainsKey("Region") ? Convert.ToString(row["Region"]) ?? string.Empty : string.Empty,
+            AddressType = row.ContainsKey("AddressType") ? Convert.ToString(row["AddressType"]) ?? string.Empty : string.Empty,
+            CustomerID = Convert.ToInt32(row["CustomerID"])
         };
     }
 }
 
-// Input Model for Binding payloads safely
+// Complete Data Transport Payloads 
 public class AddressInput
 {
     public string? AddressLine1 { get; set; }
@@ -212,14 +177,10 @@ public class Address
     public string AddressLine1 { get; set; } = string.Empty;
     public string AddressLine2 { get; set; } = string.Empty;
     public string City { get; set; } = string.Empty;
-    public int StateID { get; set; }
     public string State { get; set; } = string.Empty;
     public int PostalCode { get; set; }
-    public int CountryID { get; set; }
     public string Country { get; set; } = string.Empty;
-    public int RegionID { get; set; }
     public string Region { get; set; } = string.Empty;
-    public int AddressTypeID { get; set; }
     public string AddressType { get; set; } = string.Empty;
     public int CustomerID { get; set; }
 }

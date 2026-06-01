@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 
 // Set your C# ASP.NET Web API base URL here
-const API_BASE_URL = 'http://localhost:5000/api/products'; 
+const API_BASE_URL = 'http://localhost:5167/api/products'; 
 
 function App() {
   // 1. React Component Hooks & State Management

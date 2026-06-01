@@ -6,58 +6,32 @@ SET QUOTED_IDENTIFIER ON
 GO
 -- =============================================
 -- Author:		Harold Pagan	
--- Create date: 5/14/2026
+-- Create date: 5/20/2026
 -- Update date: 5/31/2026
--- Description:	Delete or deactivate orders (Supports Single or Batch TVP)
--- EXEC DeleteOrder @OrderID = 1
+-- Description:	Batch delete multiple orders and their cascade items using an ID list TVP
 -- =============================================
 CREATE OR ALTER PROCEDURE [dbo].[DeleteOrder]
-	@OrderID INT = NULL,
-	@OrdersIDs dbo.IDList READONLY,
-	@Delete BIT = 0
+    @OrderIDs dbo.IDList READONLY -- The new Table-Valued Parameter
 AS
 BEGIN
-	SET NOCOUNT ON;
+    SET NOCOUNT ON;
+    BEGIN TRANSACTION;
 
-	-- Combine parameters into a unified set for clean processing
-	DECLARE @IDs TABLE (OrderID INT PRIMARY KEY);
-	INSERT INTO @IDs (OrderID)
-	SELECT DISTINCT OrderID
-	FROM (
-		SELECT @OrderID AS OrderID WHERE @OrderID IS NOT NULL
-		UNION ALL
-		SELECT ID FROM @OrdersIDs
-	) AS Combined;
+    BEGIN TRY
+        -- 1. Clear linked child rows from OrderDetail first to prevent foreign key errors
+        DELETE FROM dbo.OrderDetail
+        WHERE OrderID IN (SELECT Id FROM @OrderIDs);
 
-	BEGIN TRANSACTION;
-	BEGIN TRY
-		IF @Delete = 1
-			BEGIN
-				-- 1. Cascade clear child line item dependencies first
-				DELETE od
-				FROM dbo.OrderDetails od  -- Adjust to dbo.OrderDetail if singular in your schema
-				JOIN @IDs d ON od.OrderID = d.OrderID;
+        -- 2. Delete parent records from the main Order table
+        DELETE FROM dbo.[Order]
+        WHERE OrderID IN (SELECT Id FROM @OrderIDs);
 
-				-- 2. Clear parent order header records
-				DELETE o
-				FROM dbo.[Order] o
-				JOIN @IDs d ON o.OrderID = d.OrderID;
-			END
-		ELSE 
-			BEGIN
-				-- Soft delete/deactivate records matching our parameter array
-   				UPDATE o
-				SET o.IsActive = 0
-				FROM dbo.[Order] o
-				JOIN @IDs d ON o.OrderID = d.OrderID;
-			END
-
-		COMMIT TRANSACTION;
-	END TRY
-	BEGIN CATCH
-		IF @@TRANCOUNT > 0 
-			ROLLBACK TRANSACTION;
-		THROW;
-	END CATCH;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANSACTIONCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
 END;
 GO

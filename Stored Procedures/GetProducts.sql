@@ -28,11 +28,11 @@ BEGIN
 			p.ProductKey
 		FROM dbo.Product AS p
 		JOIN dbo.Category AS c ON p.CategoryID = c.CategoryID
-		JOIN dbo.SubCategory AS sc ON p.SubCategoryID = sc.SubCategoryID
-		WHERE p.IsActive = 1;
+		JOIN dbo.SubCategory AS sc ON p.SubCategoryID = sc.SubCategoryID;
 	END TRY
 	BEGIN CATCH
 		THROW;
 	END CATCH;
 END;
 GO
+
